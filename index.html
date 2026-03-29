@@ -427,11 +427,28 @@
       document.getElementById('modal').classList.remove('show');
     }
 
-    function submitOrder() {
+    async function submitOrder() {
       const entries = Object.entries(DATA.cart);
       if (entries.length === 0) { showToast('先选几个吧～'); return; }
-      const summary = entries.map(([, { item, count }]) => `${item.name} x${count}`).join('、');
-      showToast('已选：' + summary);
+      const items = entries.map(([, { item, count }]) => ({ name: item.name, emoji: item.icon, count }));
+      try {
+        const r = await fetch('https://point-order.vercel.app/api/order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items, buyer: '宝贝' })
+        });
+        const j = await r.json();
+        if (j.success) {
+          showToast('下单成功！🫶');
+          DATA.cart = {};
+          updateBadge();
+          renderContent();
+        } else {
+          showToast('下单失败：' + (j.error || '网络错误'));
+        }
+      } catch (e) {
+        showToast('下单失败，请重试');
+      }
     }
 
     /* ========== 搜索 ========== */
