@@ -432,7 +432,8 @@
       if (entries.length === 0) { showToast('先选几个吧～'); return; }
       const items = entries.map(([, { item, count }]) => ({ name: item.name, emoji: item.icon, count }));
       try {
-        const r = await fetch('https://point-order.vercel.app/api/order', {
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '' : 'https://point-order.vercel.app';
+        const r = await fetch(API_BASE + '/api/order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ items, buyer: '宝贝' })
