@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>专属点菜单</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+      background: #f7f6f9;
+      min-height: 100vh;
+    }
+
+    /* ========== 顶栏 ========== */
+    .topbar {
+      background: white;
+      padding: 36px 14px 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #f0eef3;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .topbar-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: #f5efe8; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; overflow: hidden;
+    }
+    .topbar-mid { flex: 1; }
+    .topbar-title {
+      font-size: 17px; font-weight: 700; color: #1a1a1a;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .topbar-lv {
+      font-size: 10px; font-weight: 600; background: #7c5cbf;
+      color: white; border-radius: 6px; padding: 1px 6px;
+    }
+    .topbar-sub { font-size: 11px; color: #bbb; margin-top: 2px; }
+    .topbar-right { display: flex; align-items: center; }
+    .topbar-search { cursor: pointer; padding: 4px 6px; }
+
+    /* ========== 搜索浮层 ========== */
+    .search-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 400; top: 0; }
+    .search-overlay.show { display: block; }
+    .search-box { background: white; padding: 12px 14px; position: sticky; top: 0; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+    .search-input-row { display: flex; align-items: center; gap: 8px; }
+    .search-input {
+      flex: 1; height: 36px; border-radius: 18px;
+      border: 1.5px solid #e8e4ee; background: #f8f7fa;
+      padding: 0 14px; font-size: 14px; font-family: inherit; outline: none;
+    }
+    .search-input:focus { border-color: #7c5cbf; background: white; }
+    .search-cancel { color: #7c5cbf; background: none; border: none; font-size: 14px; cursor: pointer; font-family: inherit; padding: 6px 4px; }
+    .search-results { max-height: 60vh; overflow-y: auto; padding: 8px 0; }
+    .search-result-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; transition: background 0.15s; }
+    .search-result-item:active { background: #f5f3f8; }
+    .search-result-icon { width: 40px; height: 40px; border-radius: 10px; background: #f5f0fa; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .search-result-name { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+    .search-result-cat { font-size: 11px; color: #bbb; margin-top: 2px; }
+    .search-empty { text-align: center; padding: 30px 0; color: #bbb; font-size: 13px; }
+
+    .announce { font-size: 11px; color: #c0c0c0; padding: 6px 14px 4px; background: white; }
+
+    /* ========== 主内容 ========== */
+    .main { display: flex; flex: 1; min-height: 0; }
+
+    /* ========== 左侧分类栏 ========== */
+    .sidebar { width: 80px; background: #f8f7fa; overflow-y: auto; flex-shrink: 0; border-right: 1px solid #eeecf2; }
+    .sidebar::-webkit-scrollbar { display: none; }
+    .cat-item { padding: 14px 10px; font-size: 12px; color: #888; cursor: pointer; position: relative; line-height: 1.4; text-align: center; transition: background 0.15s; }
+    .cat-item.active { background: white; color: #1a1a1a; font-weight: 700; }
+    .cat-item.active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 24px; background: #7c5cbf; border-radius: 0 3px 3px 0; }
+
+    /* ========== 商品列表 ========== */
+    .content { flex: 1; overflow-y: auto; background: white; }
+    .cat-header { font-size: 13px; font-weight: 700; color: #1a1a1a; padding: 12px 14px 8px; position: sticky; top: 0; background: white; z-index: 10; border-bottom: 1px solid #f4f3f7; }
+    .item { display: flex; align-items: center; gap: 11px; padding: 11px 14px; border-bottom: 1px solid #f5f4f8; }
+    .item:last-child { border-bottom: none; }
+    .item-img {
+      width: 54px; height: 54px; border-radius: 12px;
+      background: #f5f0fa; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .item-body { flex: 1; min-width: 0; }
+    .item-name { font-size: 14px; font-weight: 700; color: #1a1a1a; margin-bottom: 3px; }
+    .item-sales { font-size: 11px; color: #c0c0c0; }
+    .item-add-btn {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: #7c5cbf; color: white; border: none;
+      font-size: 18px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0; font-family: inherit;
+    }
+    .item-add-btn[hidden] { display: none !important; }
+    .item-count-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .count-btn {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #f0eef3; color: #666; border: none; font-size: 16px;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      font-family: inherit;
+    }
+    .count-btn.plus { background: #7c5cbf; color: white; }
+    .count-num { font-size: 15px; font-weight: 700; color: #1a1a1a; min-width: 20px; text-align: center; }
+
+    /* ========== 底部栏 ========== */
+    .bottom { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #eeecf2; display: flex; align-items: center; padding: 10px 14px max(10px, env(safe-area-inset-bottom)); gap: 8px; z-index: 100; }
+    .bottom-cart { position: relative; cursor: pointer; padding: 6px; }
+    .bottom-cart-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
+    .bottom-cart-badge { position: absolute; top: 0; right: 0; background: #ff4d4f; color: white; font-size: 10px; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
+    .btn-random { padding: 10px 14px; border-radius: 20px; border: 1.5px solid #dcd8e8; background: white; color: #7c5cbf; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .btn-order { flex: 1; padding: 11px 16px; border-radius: 20px; border: none; background: #7c5cbf; color: white; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+
+    /* ========== 购物车滑出面板 ========== */
+    .cart-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; }
+    .cart-overlay.show { display: block; }
+    .cart-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-radius: 16px 16px 0 0; max-height: 70vh; overflow-y: auto; z-index: 201; transform: translateY(100%); transition: transform 0.3s ease; padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+    .cart-overlay.show .cart-sheet { transform: translateY(0); }
+    .cart-handle { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 10px auto 0; }
+    .cart-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px 10px; border-bottom: 1px solid #f0eef3; }
+    .cart-title { font-size: 16px; font-weight: 700; color: #1a1a1a; }
+    .cart-clear { font-size: 13px; color: #ff4d4f; cursor: pointer; }
+    .cart-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f5f4f8; }
+    .cart-item:last-child { border-bottom: none; }
+    .cart-item-icon { width: 38px; height: 38px; border-radius: 10px; background: #f5f0fa; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .cart-item-body { flex: 1; }
+    .cart-item-name { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+    .cart-item-control { display: flex; align-items: center; gap: 8px; }
+    .cart-item-control .count-btn { width: 22px; height: 22px; font-size: 14px; }
+    .cart-item-control .count-num { font-size: 14px; }
+    .cart-footer { padding: 12px 16px; border-top: 1px solid #f0eef3; }
+    .cart-submit { width: 100%; padding: 14px; border-radius: 24px; border: none; background: #7c5cbf; color: white; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; }
+
+    /* ========== 随机弹窗 ========== */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 300; align-items: center; justify-content: center; }
+    .modal.show { display: flex; }
+    .modal-box { background: white; border-radius: 20px; padding: 28px 24px 22px; text-align: center; width: 78%; max-width: 280px; }
+    .modal-icon { width: 80px; height: 80px; border-radius: 20px; background: #f5f0fa; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+    .modal-name { font-size: 18px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+    .modal-desc { font-size: 12px; color: #bbb; margin-bottom: 20px; }
+    .modal-btn { width: 100%; padding: 12px; border-radius: 50px; border: none; background: #7c5cbf; color: white; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
+
+    /* Toast */
+    .toast { position: fixed; top: 90px; left: 50%; transform: translateX(-50%) translateY(-8px); background: rgba(30,20,50,0.8); color: white; padding: 9px 20px; border-radius: 50px; font-size: 13px; z-index: 500; opacity: 0; pointer-events: none; transition: all 0.25s; white-space: nowrap; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+  <!-- 顶栏 -->
+  <div class="topbar">
+    <div class="topbar-avatar">
+      <!-- 女生头像 SVG -->
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <circle cx="18" cy="18" r="18" fill="#f5efe8"/>
+        <path d="M18 8C14.13 8 11 11.13 11 15C11 17.34 12.34 19.43 14.3 20.66L13.1 25H22.9L21.7 20.66C23.66 19.43 25 17.34 25 15C25 11.13 21.87 8 18 8Z" fill="#e8c4a0"/>
+        <circle cx="18" cy="15" r="4" fill="#f5efe8"/>
+        <path d="M13 26C13 23.79 15.46 22 18 22C20.54 22 23 23.79 23 26" stroke="#e8c4a0" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="topbar-mid">
+      <div class="topbar-title">江佳欣是神 <span class="topbar-lv">Lv.0</span></div>
+      <div class="topbar-sub">公告：暂无</div>
+    </div>
+    <div class="topbar-right">
+      <!-- 搜索图标 -->
+      <div class="topbar-search" onclick="openSearch()">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="8.5" cy="8.5" r="5.5" stroke="#888" stroke-width="1.5"/>
+          <path d="M13 13L17 17" stroke="#888" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <div class="announce"></div>
+
+  <!-- 搜索浮层 -->
+  <div class="search-overlay" id="searchOverlay">
+    <div class="search-box">
+      <div class="search-input-row">
+        <input class="search-input" id="searchInput" placeholder="搜索商品..." autocomplete="off">
+        <button class="search-cancel" onclick="closeSearch()">取消</button>
+      </div>
+      <div class="search-results" id="searchResults"></div>
+    </div>
+  </div>
+
+  <!-- 主内容 -->
+  <div class="main">
+    <div class="sidebar" id="sidebar"></div>
+    <div class="content" id="content"></div>
+  </div>
+
+  <!-- 底部 -->
+  <div class="bottom">
+    <div class="bottom-cart" onclick="openCart()">
+      <div class="bottom-cart-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="6" width="18" height="15" rx="2" stroke="#555" stroke-width="1.5"/>
+          <path d="M8 6V5C8 3.34 9.34 2 11 2H13C14.66 2 16 3.34 16 5V6" stroke="#555" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="9" cy="13.5" r="1" fill="#555"/>
+          <circle cx="15" cy="13.5" r="1" fill="#555"/>
+        </svg>
+      </div>
+      <span class="bottom-cart-badge" id="totalBadge" style="display:none">0</span>
+    </div>
+    <button class="btn-random" onclick="doRandom()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="display:inline;vertical-align:middle;margin-right:4px">
+        <path d="M2 2L12 12M2 12L12 2" stroke="#7c5cbf" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      随机
+    </button>
+    <button class="btn-order" onclick="submitOrder()">去下单</button>
+  </div>
+
+  <!-- 购物车面板 -->
+  <div class="cart-overlay" id="cartOverlay">
+    <div class="cart-sheet" onclick="event.stopPropagation()">
+      <div class="cart-handle"></div>
+      <div class="cart-header">
+        <div class="cart-title">已选商品</div>
+        <div class="cart-clear" onclick="clearCart()">清空</div>
+      </div>
+      <div id="cartContent"></div>
+      <div class="cart-footer">
+        <button class="cart-submit" onclick="submitOrder()">去下单</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 随机弹窗 -->
+  <div class="modal" id="modal">
+    <div class="modal-box">
+      <div class="modal-icon" id="modalIcon"></div>
+      <div class="modal-name" id="mName">加载中...</div>
+      <div class="modal-desc" id="mDesc"></div>
+      <button class="modal-btn" onclick="okRandom()">就这个了！</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    /* ========== 图标库（Apple风格线稿SVG） ========== */
+    const ICONS = {
+      // 奶茶
+      milkTea: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M8 10V24M8 10C8 10 8 8 10 8H18C20 8 20 10 20 10V24" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10H22" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M20 14H22M20 18H22M20 22H22" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M11 4C11 4 12 6 14 6C16 6 17 4 17 4" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+
+      // 咖啡
+      coffee: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M6 10H20V22C20 23.1 19.1 24 18 24H8C6.9 24 6 23.1 6 22V10Z" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M20 12H22C23.1 12 24 12.9 24 14V15C24 16.1 23.1 17 22 17H20" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M10 4C10 4 10.5 6 12 6C13.5 6 14 4 14 4" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M8 16H18" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+
+      // 饮料（通用）
+      drink: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M9 4L7 24H21L19 4" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 4H19" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M12 10L16 14" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+
+      // 火锅
+      hotpot: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><ellipse cx="14" cy="18" rx="9" ry="5" stroke="#7c5cbf" stroke-width="1.4"/><path d="M5 18V14C5 11.79 7.24 10 10 10H18C20.76 10 23 11.79 23 14V18" stroke="#7c5cbf" stroke-width="1.4"/><path d="M14 4V6M10 5L11 6M18 5L17 6" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M10 22C10 22 11 23 14 23C17 23 18 22 18 22" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+
+      // 烧烤
+      bbq: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M6 16C6 16 8 20 14 20C20 20 22 16 22 16" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M6 16L8 8M22 16L20 8" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M8 8H20" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M10 8V11M14 8V11M18 8V11" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><circle cx="9" cy="13.5" r="0.8" fill="#7c5cbf"/><circle cx="14" cy="13" r="0.8" fill="#7c5cbf"/><circle cx="19" cy="13.5" r="0.8" fill="#7c5cbf"/></svg>`,
+
+      // 炸鸡
+      chicken: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M9 12C9 12 7 9 9 7C11 5 14 6 14 6C14 6 17 5 19 7C21 9 19 12 19 12" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M7 14L6 20C6 21.1 6.9 22 8 22H20C21.1 22 22 21.1 22 20L21 14" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M10 17C10 17 11 19 14 19C17 19 18 17 18 17" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+
+      // 爱心/情绪
+      heart: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 22C14 22 4 16 4 10C4 7.24 6.24 5 9 5C10.74 5 12.26 5.88 13.14 7.14L14 8.34L14.86 7.14C15.74 5.88 17.26 5 19 5C21.76 5 24 7.24 24 10C24 16 14 22 14 22Z" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+
+      // 星星
+      star: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 4L16.5 10.5L23 11.5L18 16.5L19.5 23L14 20L8.5 23L10 16.5L5 11.5L11.5 10.5L14 4Z" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+
+      // 捏/揉头
+      hand: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 18.5V8.5M10 12C10 12 11 10 14 10C17 10 18 12 18 12" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><path d="M8 18.5C8 18.5 7 20 7 22C7 23.66 8.34 25 10 25H18C19.66 25 21 23.66 21 22C21 20 20 18.5 20 18.5" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+
+      // 问号/随便
+      question: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="10" stroke="#7c5cbf" stroke-width="1.4"/><path d="M11 10.5C11 8.57 12.57 7 14.5 7C16.43 7 18 8.57 18 10.5C18 12.15 16.8 13.07 16 13.5" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/><circle cx="14" cy="18.5" r="0.8" fill="#7c5cbf"/></svg>`,
+
+      // 默认/文件夹
+      default: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M4 8C4 6.9 4.9 6 6 6H10L12 9H22C23.1 9 24 9.9 24 11V20C24 21.1 23.1 22 22 22H6C4.9 22 4 21.1 4 20V8Z" stroke="#7c5cbf" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+
+      // 列表图标（购物车面板）
+      list: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="3" width="18" height="16" rx="2" stroke="#555" stroke-width="1.4"/><path d="M7 7H15M7 11H15M7 15H12" stroke="#555" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+    };
+
+    /* ========== 商品配置 ========== */
+    const DATA = {
+      cats: ['暂未分类', '奶茶', '情绪', '吃的'],
+      items: [
+        { cat: 0, name: '不知道吃啥，老婆随便点', icon: 'question', sales: '月销 0' },
+        { cat: 1, name: '要喝霸王茶姬', icon: 'milkTea', sales: '月销 0' },
+        { cat: 1, name: '要喝古茗', icon: 'milkTea', sales: '月销 0' },
+        { cat: 1, name: '要喝瑞幸', icon: 'coffee', sales: '月销 0' },
+        { cat: 1, name: '要喝喜茶', icon: 'drink', sales: '月销 0' },
+        { cat: 1, name: '要喝一点点', icon: 'drink', sales: '月销 0' },
+        { cat: 2, name: '抱抱', icon: 'heart', sales: '' },
+        { cat: 2, name: '夸夸', icon: 'star', sales: '' },
+        { cat: 2, name: '揉揉头', icon: 'hand', sales: '' },
+        { cat: 3, name: '火锅', icon: 'hotpot', sales: '' },
+        { cat: 3, name: '烧烤', icon: 'bbq', sales: '' },
+        { cat: 3, name: '炸鸡', icon: 'chicken', sales: '' },
+      ],
+      cart: {},
+      currentCat: 1,
+      lastRandom: null,
+    };
+
+    function getIcon(name) { return ICONS[name] || ICONS.default; }
+
+    function init() {
+      renderSidebar();
+      renderContent();
+      setupSearch();
+    }
+
+    function renderSidebar() {
+      const el = document.getElementById('sidebar');
+      el.innerHTML = DATA.cats.map((c, i) =>
+        `<div class="cat-item ${DATA.currentCat === i ? 'active' : ''}" onclick="setCat(${i})">${c}</div>`
+      ).join('');
+    }
+
+    function setCat(i) {
+      DATA.currentCat = i;
+      renderSidebar();
+      renderContent();
+    }
+
+    function renderContent() {
+      const el = document.getElementById('content');
+      const catItems = DATA.items.filter(x => x.cat === DATA.currentCat);
+      el.innerHTML = `
+        <div class="cat-header">${DATA.cats[DATA.currentCat]} (${catItems.length})</div>
+        ${catItems.map(item => {
+          const count = DATA.cart[item.name] ? DATA.cart[item.name].count : 0;
+          const safeId = item.name.replace(/'/g, '\\u27');
+          return `
+            <div class="item">
+              <div class="item-img">${getIcon(item.icon)}</div>
+              <div class="item-body">
+                <div class="item-name">${item.name}</div>
+                ${item.sales ? `<div class="item-sales">${item.sales}</div>` : ''}
+              </div>
+              <div class="item-count-control" ${count > 0 ? '' : 'style="display:none"'} id="ctrl-${safeId}">
+                <button class="count-btn" onclick="decItem('${safeId}')">−</button>
+                <span class="count-num">${count}</span>
+                <button class="count-btn plus" onclick="incItem('${safeId}')">+</button>
+              </div>
+              <button class="item-add-btn" id="addbtn-${safeId}" onclick="incItem('${safeId}')" ${count > 0 ? 'hidden' : ''}>+</button>
+            </div>
+          `;
+        }).join('')}
+      `;
+    }
+
+    function incItem(safeId) {
+      const name = safeId.replace(/\\u27/g, "'");
+      const item = DATA.items.find(x => x.name === name);
+      if (!item) return;
+      if (!DATA.cart[name]) DATA.cart[name] = { item, count: 0 };
+      DATA.cart[name].count++;
+      updateBadge();
+      renderContent();
+    }
+
+    function decItem(safeId) {
+      const name = safeId.replace(/\\u27/g, "'");
+      if (!DATA.cart[name]) return;
+      DATA.cart[name].count--;
+      if (DATA.cart[name].count <= 0) delete DATA.cart[name];
+      updateBadge();
+      renderContent();
+    }
+
+    function updateBadge() {
+      const total = Object.values(DATA.cart).reduce((s, c) => s + c.count, 0);
+      const b = document.getElementById('totalBadge');
+      b.style.display = total > 0 ? 'flex' : 'none';
+      b.textContent = total;
+    }
+
+    function openCart() {
+      const content = document.getElementById('cartContent');
+      const entries = Object.entries(DATA.cart);
+      if (entries.length === 0) {
+        content.innerHTML = '<div style="text-align:center;padding:40px 0;color:#bbb;font-size:14px">还没选呢～</div>';
+      } else {
+        content.innerHTML = entries.map(([name, { item, count }]) => {
+          const safeId = name.replace(/'/g, '\\u27');
+          return `
+            <div class="cart-item">
+              <div class="cart-item-icon">${getIcon(item.icon)}</div>
+              <div class="cart-item-body"><div class="cart-item-name">${item.name}</div></div>
+              <div class="cart-item-control">
+                <button class="count-btn" onclick="decItem('${safeId}');openCart();">−</button>
+                <span class="count-num">${count}</span>
+                <button class="count-btn plus" onclick="incItem('${safeId}');openCart();">+</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+      document.getElementById('cartOverlay').classList.add('show');
+    }
+
+    function clearCart() {
+      DATA.cart = {};
+      updateBadge();
+      renderContent();
+      closeCart();
+    }
+
+    function closeCart() {
+      document.getElementById('cartOverlay').classList.remove('show');
+    }
+
+    function doRandom() {
+      const items = DATA.items.filter(x => x.cat === DATA.currentCat);
+      const p = items[Math.floor(Math.random() * items.length)] || DATA.items[Math.floor(Math.random() * DATA.items.length)];
+      DATA.lastRandom = p;
+      document.getElementById('modalIcon').innerHTML = getIcon(p.icon);
+      document.getElementById('mName').textContent = p.name;
+      document.getElementById('mDesc').textContent = p.sales || '';
+      document.getElementById('modal').classList.add('show');
+    }
+
+    function okRandom() {
+      if (DATA.lastRandom) incItem(DATA.lastRandom.name.replace(/'/g, '\\u27'));
+      document.getElementById('modal').classList.remove('show');
+    }
+
+    function submitOrder() {
+      const entries = Object.entries(DATA.cart);
+      if (entries.length === 0) { showToast('先选几个吧～'); return; }
+      const summary = entries.map(([, { item, count }]) => `${item.name} x${count}`).join('、');
+      showToast('已选：' + summary);
+    }
+
+    /* ========== 搜索 ========== */
+    function setupSearch() {
+      const input = document.getElementById('searchInput');
+      input.addEventListener('input', function() { doSearch(this.value); });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          const val = this.value.trim();
+          if (val) {
+            const matched = DATA.items.find(i => i.name.includes(val));
+            if (matched) {
+              DATA.currentCat = matched.cat;
+              renderSidebar();
+              renderContent();
+              closeSearch();
+            }
+          }
+        }
+      });
+    }
+
+    function openSearch() {
+      document.getElementById('searchOverlay').classList.add('show');
+      document.getElementById('searchInput').focus();
+      doSearch('');
+    }
+
+    function closeSearch() {
+      document.getElementById('searchOverlay').classList.remove('show');
+      document.getElementById('searchInput').value = '';
+    }
+
+    function doSearch(query) {
+      const results = document.getElementById('searchResults');
+      if (!query) { results.innerHTML = ''; return; }
+      const matched = DATA.items.filter(i => i.name.toLowerCase().includes(query.toLowerCase()));
+      if (matched.length === 0) {
+        results.innerHTML = '<div class="search-empty">没有找到相关商品</div>';
+        return;
+      }
+      results.innerHTML = matched.map(item => {
+        const safeId = item.name.replace(/'/g, '\\u27');
+        return `
+          <div class="search-result-item" onclick="searchSelect('${safeId}', ${item.cat})">
+            <div class="search-result-icon">${getIcon(item.icon)}</div>
+            <div>
+              <div class="search-result-name">${item.name}</div>
+              <div class="search-result-cat">${DATA.cats[item.cat]}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function searchSelect(safeId, catIdx) {
+      DATA.currentCat = catIdx;
+      renderSidebar();
+      renderContent();
+      closeSearch();
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    document.getElementById('modal').addEventListener('click', function(e) {
+      if (e.target === this) this.classList.remove('show');
+    });
+
+    document.getElementById('cartOverlay').addEventListener('click', function(e) {
+      if (e.target === this) closeCart();
+    });
+
+    init();
+  </script>
+</body>
+</html>
