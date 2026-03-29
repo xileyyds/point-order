@@ -1,10 +1,12 @@
 const https = require('https');
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GIST_ID = process.env.GIST_ID || null;
-let cache = null;
+const REPO_OWNER = 'xileyyds';
+const REPO_NAME = 'point-order';
+const BRANCH = 'main';
+const DATA_FILE = 'data-orders.json';
 
-function gistReq(method, path, data) {
+function githubReq(method, path, data) {
   return new Promise((resolve, reject) => {
     const body = data ? JSON.stringify(data) : undefined;
     const opts = {
@@ -31,33 +33,28 @@ function gistReq(method, path, data) {
 }
 
 async function loadData() {
-  if (cache) return cache;
-  if (!GITHUB_TOKEN) return { orders: [], lastId: 0, gistId: null };
-
+  if (!GITHUB_TOKEN) return { orders: [], lastId: 0 };
   try {
-    if (GIST_ID) {
-      const gist = await gistReq('GET', `/gists/${GIST_ID}`);
-      const f = gist.files && gist.files['orders.json'];
-      if (f && f.content) { cache = JSON.parse(f.content); return cache; }
+    const path = `/repos/${REPO_OWNER}/${REPO_NAME}/contents/${DATA_FILE}?ref=${BRANCH}`;
+    const r = await githubReq('GET', path);
+    if (r.content) {
+      return JSON.parse(Buffer.from(r.content, 'base64').toString('utf8'));
     }
-  } catch (e) { console.error('load error:', e.message); }
-  return { orders: [], lastId: 0, gistId: GIST_ID };
+  } catch (e) {}
+  return { orders: [], lastId: 0 };
 }
 
 async function saveData(data) {
-  cache = data;
   if (!GITHUB_TOKEN) return;
-  const content = JSON.stringify(data, null, 2);
-  const files = { 'orders.json': { content } };
+  const content = Buffer.from(JSON.stringify(data, null, 2)).toString('base64');
+  const path = `/repos/${REPO_OWNER}/${REPO_NAME}/contents/${DATA_FILE}`;
+  let sha = null;
   try {
-    if (!GIST_ID) {
-      const gist = await gistReq('POST', '/gists', { public: false, description: 'point-order data', files });
-      process.env.GIST_ID = gist.id;
-      console.log('Gist created:', gist.id);
-    } else {
-      await gistReq('PATCH', `/gists/${GIST_ID}`, { files });
-    }
-  } catch (e) { console.error('save error:', e.message); }
+    const existing = await githubReq('GET', `${path}?ref=${BRANCH}`);
+    sha = existing.sha;
+  } catch {}
+  const body = { message: 'update orders', content, branch: BRANCH, ...(sha ? { sha } : {}) };
+  await githubReq('PUT', path, body);
 }
 
 module.exports = async (req, res) => {
